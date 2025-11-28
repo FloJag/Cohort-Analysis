@@ -1,0 +1,560 @@
+{
+  "datasets": [
+    {
+      "name": "50554add",
+      "displayName": "Retention Rate",
+      "queryLines": [
+        "with retention_table as (\r\n",
+        "  SELECT  \r\n",
+        "  customer_id, \r\n",
+        "  DATE_FORMAT(DATE_TRUNC('month', first_purchase_date), 'yyyy-MM') AS cohort_month,\r\n",
+        "  DATE_DIFF(month, first_purchase_date, second_purchase_date) as month_between_purchases,\r\n",
+        "  -- flag the month between the first and the second purchase\r\n",
+        "  CASE WHEN month_between_purchases <= 1 THEN 1 ELSE 0 END AS retention_rate_1m,\r\n",
+        "  CASE WHEN month_between_purchases <= 2 THEN 1 ELSE 0 END as retention_rate_2m,\r\n",
+        "  CASE WHEN month_between_purchases <= 3 THEN 1 ELSE 0 END as retention_rate_3m\r\n",
+        "from workspace.bigquery_db_cohort_db.cohort_analysis\r\n",
+        "group by customer_id, first_purchase_date, second_purchase_date\r\n",
+        ")\r\n",
+        "\r\n",
+        "-- retention percentages\r\n",
+        "select cohort_month, \r\n",
+        "       -- calculate the retention rates for each intervall\r\n",
+        "       round(100 * sum(retention_rate_1m)/count(customer_id),2) as retention_rate_1m,\r\n",
+        "       round(100 * sum(retention_rate_2m)/count(customer_id),2) as retention_rate_2m,\r\n",
+        "       round(100 * sum(retention_rate_3m)/count(customer_id),2) as retention_rate_3m\r\n",
+        "from retention_table\r\n",
+        "group by cohort_month\r\n",
+        "ORDER BY cohort_month\r\n",
+        "\r\n",
+        "\r\n",
+        " \r\n"
+      ]
+    },
+    {
+      "name": "c7a25bf3",
+      "displayName": "Repeat Rate",
+      "queryLines": [
+        "  with customer_orders as (\r\n",
+        "  SELECT customer_id, \r\n",
+        "        date_format(date_trunc(\"month\", min(first_purchase_date)),'yyyy-MM') as cohort_month,\r\n",
+        "        total_orders\r\n",
+        "\r\n",
+        "  From workspace.bigquery_db_cohort_db.cohort_analysis\r\n",
+        "  group by customer_id, total_orders\r\n",
+        "  ),\r\n",
+        "  \r\n",
+        "  order_nums as (\r\n",
+        "  select *,\r\n",
+        "  CASE WHEN total_orders >= 2 THEN 1 END AS fct_2plus_orders,\r\n",
+        "  CASE WHEN total_orders >= 3 THEN 1 END AS fct_3plus_orders,\r\n",
+        "  CASE WHEN total_orders >= 4 THEN 1 END AS fct_4plus_orders  \r\n",
+        "  from customer_orders\r\n",
+        "  group by customer_id, cohort_month, total_orders\r\n",
+        "  )\r\n",
+        "\r\n",
+        "  SELECT cohort_month, \r\n",
+        "  ROUND(100 * sum(fct_2plus_orders)/ count(customer_id), 2) as num_2plus_orders,\r\n",
+        "  ROUND(100* sum(fct_3plus_orders)/ count(customer_id), 2) as num_3plus_orders,\r\n",
+        "  ROUND(100* sum(fct_4plus_orders)/ count(customer_id),2) as num_4plus_orders\r\n",
+        "  from order_nums\r\n",
+        "  group by cohort_month\r\n",
+        "  order by cohort_month"
+      ]
+    },
+    {
+      "name": "c7f7ba80",
+      "displayName": "Cohort Size",
+      "queryLines": [
+        "Select date_format(date_trunc('month', first_purchase_date), 'yyyy-MM') as cohort_month,\r\n",
+        "       count(customer_id) as new_customers\r\n",
+        "from workspace.bigquery_db_cohort_db.cohort_analysis\r\n",
+        "group by cohort_month\r\n"
+      ]
+    },
+    {
+      "name": "4c703a79",
+      "displayName": "Avg Count of Days until 2nd purchase",
+      "queryLines": [
+        "\r\n",
+        "with customer_avg as (\r\n",
+        "    select customer_id,\r\n",
+        "    date_format(date_trunc(\"month\", min(first_purchase_date)),'yyyy-MM') as cohort_month,\r\n",
+        "    days_between_purchases\r\n",
+        "from workspace.bigquery_db_cohort_db.cohort_analysis\r\n",
+        "group by customer_id, days_between_purchases    \r\n",
+        ")\r\n",
+        "\r\n",
+        "select cohort_month, Round(avg(days_between_purchases) / 30.44, 2) as avg_month_between_purchases\r\n",
+        "from customer_avg\r\n",
+        "group by cohort_month"
+      ]
+    },
+    {
+      "name": "87c93c8b",
+      "displayName": "KPI total orders",
+      "queryLines": [
+        "select sum(total_orders) as sum_total_orders from workspace.bigquery_db_cohort_db.cohort_analysis"
+      ]
+    },
+    {
+      "name": "44b5993e",
+      "displayName": "KPI total customers",
+      "queryLines": [
+        "select count(distinct customer_id) as total_customers from workspace.bigquery_db_cohort_db.cohort_analysis"
+      ]
+    },
+    {
+      "name": "40702cb4",
+      "displayName": "KPI total cohorts",
+      "queryLines": [
+        "with cohorts as (\n",
+        "    select customer_id,\n",
+        "    date_format(date_trunc(\"month\", min(first_purchase_date)),'yyyy-MM') as cohort_month\n",
+        "from workspace.bigquery_db_cohort_db.cohort_analysis   \n",
+        "group by customer_id \n",
+        ")\n",
+        "select count(distinct cohort_month) from  cohorts"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "236aac68",
+      "displayName": "Cohort Analysis",
+      "layout": [
+        {
+          "widget": {
+            "name": "2f9d908b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "50554add",
+                  "fields": [
+                    {
+                      "name": "cohort_month",
+                      "expression": "`cohort_month`"
+                    },
+                    {
+                      "name": "sum(retention_rate_1m)",
+                      "expression": "SUM(`retention_rate_1m`)"
+                    },
+                    {
+                      "name": "sum(retention_rate_2m)",
+                      "expression": "SUM(`retention_rate_2m`)"
+                    },
+                    {
+                      "name": "sum(retention_rate_3m)",
+                      "expression": "SUM(`retention_rate_3m`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "area",
+              "encodings": {
+                "x": {
+                  "fieldName": "cohort_month",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(retention_rate_1m)",
+                      "displayName": "retention rate 1m"
+                    },
+                    {
+                      "fieldName": "sum(retention_rate_2m)",
+                      "displayName": "retention rate 2m"
+                    },
+                    {
+                      "fieldName": "sum(retention_rate_3m)",
+                      "displayName": "retention rate 3m"
+                    }
+                  ],
+                  "axis": {
+                    "hideTitle": true
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Retention Rate by Cohort",
+                "showDescription": true,
+                "description": "As the year progresses, the retention rate becomes becomes higher."
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cbd648d0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c7a25bf3",
+                  "fields": [
+                    {
+                      "name": "cohort_month",
+                      "expression": "`cohort_month`"
+                    },
+                    {
+                      "name": "num_2plus_orders",
+                      "expression": "`num_2plus_orders`"
+                    },
+                    {
+                      "name": "num_3plus_orders",
+                      "expression": "`num_3plus_orders`"
+                    },
+                    {
+                      "name": "num_4plus_orders",
+                      "expression": "`num_4plus_orders`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "cohort_month",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "num_2plus_orders",
+                      "displayName": "2+ orders"
+                    },
+                    {
+                      "fieldName": "num_3plus_orders",
+                      "displayName": "3+ orders"
+                    },
+                    {
+                      "fieldName": "num_4plus_orders",
+                      "displayName": "4+ orders"
+                    }
+                  ],
+                  "axis": {
+                    "hideTitle": true
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Repeat Purchase Rate by Cohort",
+                "showDescription": true,
+                "description": "Cohort 2024-01 has the strongest purchasing power. Repeated purchases became increasingly rare among subsequent cohorts."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "b97fd9fd",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c7f7ba80",
+                  "fields": [
+                    {
+                      "name": "cohort_month",
+                      "expression": "`cohort_month`"
+                    },
+                    {
+                      "name": "sum(new_customers)",
+                      "expression": "SUM(`new_customers`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "cohort_month",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(new_customers)",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Cohort Size by Month",
+                "showDescription": true,
+                "description": "2024-01 is the biggest cohort. As the year progresses, the cohort size becomes smaller."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "6b2d4e42",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"font-size:24px\">**Cohort Analysis of Sales data**</span>\n",
+                "\n",
+                "This dashboard shows the loyalty of customer cohorts who made purchases between January and June 2024."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "58e0d5c0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4c703a79",
+                  "fields": [
+                    {
+                      "name": "cohort_month",
+                      "expression": "`cohort_month`"
+                    },
+                    {
+                      "name": "sum(avg_month_between_purchases)",
+                      "expression": "SUM(`avg_month_between_purchases`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "cohort_month",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(avg_month_between_purchases)",
+                  "axis": {
+                    "title": "Avg # of month between purchases",
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Average number of months until the second purchase",
+                "showDescription": true,
+                "description": "The first cohorts purchase less frequently than the last ones."
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 10,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "f8e7aff4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "87c93c8b",
+                  "fields": [
+                    {
+                      "name": "sum_total_orders",
+                      "expression": "`sum_total_orders`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum_total_orders"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Orders"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c2ef00dd",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "44b5993e",
+                  "fields": [
+                    {
+                      "name": "total_customers",
+                      "expression": "`total_customers`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_customers"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Customers"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "83453234",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "40702cb4",
+                  "fields": [
+                    {
+                      "name": "count(DISTINCT cohort_month)",
+                      "expression": "`count(DISTINCT cohort_month)`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(DISTINCT cohort_month)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Number of Cohorts"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
